@@ -19,7 +19,7 @@ Unlike existing models, which are frame-wise and exhibit limited multi-view cons
 Using Muskie as a backbone consistently enhances performance on downstream 3D tasks.
 
 ## Demo
-We provide a demo script to visualize the reconstruction from masked views in [muskie-visualize.ipynb](./muskie-visualize.ipynb).
+We provide a demo script to visualize the reconstruction from masked views in [muskie-visualize.ipynb](./muskie-visualize.ipynb). The pretrained weights can be downloaded from [here](https://drive.google.com/drive/folders/1uKXUlAwE66Wdes_fykKVNjuP1wDxBylg?usp=drive_link).
 
 <div align="center">
   <img src="examples/demo.png" height="600">
@@ -50,6 +50,12 @@ torchrun --nproc_per_node 8 --master_port 12345 main.py --warmup_epochs 2 \
          --mask_ratio 0.9 0.75 0.75 \
          --dynamic_batch --enable_checkpoint
 ```
+
+## Checklist
+
+- [ ] Release the training code for downstream tasks
+- [ ] Release the evaluation code for multi-view consistency
+- [ ] Release Muskie-Huge
 
 ## BibTeX
 ```bibtex
