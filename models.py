@@ -299,8 +299,7 @@ class MultiViewCroco(nn.Module):
         pred, conf = torch.chunk(x, 2, dim=-1)
         conf = torch.sigmoid(conf)
 
-        # loss_dict, per_instance_loss = self.compute_confloss(images, pred, conf, mask)
-        loss_dict, per_instance_loss = self.compute_loss(images, pred, conf, mask)
+        loss_dict, per_instance_loss = self.compute_confloss(images, pred, conf, mask)
 
         pred = F.pixel_shuffle(pred.view(B,V,Hp,Wp,-1).permute(0,1,4,2,3), upscale_factor=self.patch_size)
         conf = F.pixel_shuffle(conf.view(B,V,Hp,Wp,-1).permute(0,1,4,2,3), upscale_factor=self.patch_size)

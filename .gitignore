@@ -1,2 +1,5 @@
-checkpoints/muskie-base.pth
-checkpoints/muskie-large.pth
+checkpoints/
+
+__pycache__/
+*.pyc
+.ipynb_checkpoints

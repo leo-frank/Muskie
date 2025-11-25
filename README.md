@@ -18,11 +18,19 @@ Muskie is a native multi-view vision backbone designed for 3D vision tasks.
 Unlike existing models, which are frame-wise and exhibit limited multi-view consistency, Muskie is designed to process multiple views simultaneously and introduce multi-view consistency in pre-training stage. 
 Using Muskie as a backbone consistently enhances performance on downstream 3D tasks.
 
+## Demo
+We provide a demo script to visualize the reconstruction from masked views in [muskie-visualize.ipynb](./muskie-visualize.ipynb).
+
+<div align="center">
+  <img src="examples/demo.png" height="600">
+</div>
+
+
 ## Pre-training
 
 The pre-training takes about two weeks for Muskie-L and one week for Muskie-B on 8 A100 GPUs.
 
-Try train Muskie-B with following codes:
+Train Muskie-B with following codes:
 ```shell
 torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
          --model base --epochs 400 --epoch_size 100_000 --batch_size 4 \
@@ -31,10 +39,19 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
          --mask_mode random rectangle ellipse \
          --mask_ratio 0.9 0.75 0.75 \
          --dynamic_batch
-
+```
+Train Muskie-L with following codes:
+```shell
+torchrun --nproc_per_node 8 --master_port 12345 main.py --warmup_epochs 2 \
+         --model large --epochs 400 --epoch_size 100_000 --batch_size 16 \
+         --lr 2e-4 --input_size_list 224 384 512 --log_dir output_dir/large \
+         --output_dir output_dir/large \
+         --mask_mode random rectangle ellipse \
+         --mask_ratio 0.9 0.75 0.75 \
+         --dynamic_batch --enable_checkpoint
 ```
 
-## Reference
+## BibTeX
 ```bibtex
 @misc{li2025muskiemultiviewmaskedimage,
         title={Muskie: Multi-view Masked Image Modeling for 3D Vision Pre-training}, 
@@ -44,6 +61,5 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
         archivePrefix={arXiv},
         primaryClass={cs.CV},
         url={https://arxiv.org/abs/2511.18115}
-}
 }
 ```
