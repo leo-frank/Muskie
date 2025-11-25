@@ -32,7 +32,6 @@
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <link rel="stylesheet" href="./static/css/index.css">
-  <link rel="icon" href="./static/images/favicon.svg">
 
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script defer src="./static/js/fontawesome.all.min.js"></script>
@@ -98,10 +97,10 @@
           <div class="is-size-6 publication-authors">
             <span class="author-block"><sup>+</sup>co-first author</span>
           </div>
-          <!-- <div class="column has-text-centered">
+          <div class="column has-text-centered">
             <div class="publication-links">
               <span class="link-block">
-                <a href="https://arxiv.org/pdf/2011.12948"
+                <a hef="https://arxiv.org/pdf/2511.18115"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fas fa-file-pdf"></i>
@@ -110,7 +109,7 @@
                 </a>
               </span>
               <span class="link-block">
-                <a href="https://arxiv.org/abs/2011.12948"
+                <a href="https://arxiv.org/abs/2511.18115"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="ai ai-arxiv"></i>
@@ -118,7 +117,7 @@
                   <span>arXiv</span>
                 </a>
               </span>
-              <span class="link-block">
+              <!-- <span class="link-block">
                 <a href="https://www.youtube.com/watch?v=MrKrnHhk8IA"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
@@ -126,9 +125,9 @@
                   </span>
                   <span>Video</span>
                 </a>
-              </span>
+              </span> -->
               <span class="link-block">
-                <a href="https://github.com/google/nerfies"
+                <a href="https://github.com/leo-frank/Muskie"
                    class="external-link button is-normal is-rounded is-dark">
                   <span class="icon">
                       <i class="fab fa-github"></i>
@@ -136,7 +135,7 @@
                   <span>Code</span>
                   </a>
               </span>
-            </div> -->
+            </div>
 
           </div>
         </div>
@@ -156,6 +155,7 @@
         
         <br><br>
 
+        
         <div class="columns is-centered has-text-centered">
           <div class="container is-max-desktop">
               <img src="./arch_compare.png"
@@ -179,22 +179,25 @@
             Compared with state-of-the-art frame-wise backbones such as DINO, Muskie achieves higher multi-view correspondence accuracy. Furthermore, we demonstrate that using Muskie as a backbone  consistently enhances performance on downstream 3D tasks, including camera pose estimation and pointmap reconstruction.
           </p>
         </div>
+
+        <br><br>
+
+        <div class="columns is-centered has-text-centered">
+          <div class="container is-max-desktop">
+            <h2 class="title is-3">Video</h2>
+              <video id="teaser" autoplay muted loop playsinline controls height="100%">
+                <source src="./Muskie_video_4_github.mp4"
+                        type="video/mp4">
+              </video>
+          </div>
+        </div>
+
       </div>
     </div>
 
 
     <br><br><br>
 
-
-    <!-- <div class="columns is-centered has-text-centered">
-      <div class="container is-max-desktop">
-        <h2 class="title is-3">Video</h2>
-          <video id="teaser" autoplay muted loop playsinline controls height="100%">
-            <source src="./Muskie_video.mp4"
-                    type="video/mp4">
-          </video>
-      </div>
-    </div> -->
 
     <br><br><br>
 
