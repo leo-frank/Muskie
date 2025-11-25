@@ -9,7 +9,7 @@
 <!-- <a href='https://huggingface.co/spaces/facebook/vggt'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a> -->
 
 
-**Wenyu Li**<sup>†</sup>, **Sidun Liu**<sup>†</sup>, **Peng Qiao**<sup>\*</sup>, **Yong Dou**<sup>\*</sup>, Tongrui Hu
+**Wenyu Li**<sup>†</sup>, **Sidun Liu**<sup>†</sup>, **Peng Qiao**<sup>\*</sup>, **Yong Dou**<sup>\*</sup>, **Tongrui Hu**
 
 </div>
 
