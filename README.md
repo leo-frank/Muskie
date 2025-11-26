@@ -18,6 +18,27 @@ Muskie is a native multi-view vision backbone designed for 3D vision tasks.
 Unlike existing models, which are frame-wise and exhibit limited multi-view consistency, Muskie is designed to process multiple views simultaneously and introduce multi-view consistency in pre-training stage. 
 Using Muskie as a backbone consistently enhances performance on downstream 3D tasks.
 
+Here we provide PCA visualizations of learned features and comparison with DINOv3.
+
+<div align="center">
+    <img src="examples/original_linken.png" width="70%" />
+    <br>
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+        Input Images
+    </div><br>
+    <img src="examples/pca_view_7.png" width="70%" />
+    <br>
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+        Muskie
+    </div><br>
+    <img src="examples/pca_dino.png" width="70%" />
+    <br>
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+        DINOv3
+    </div>
+
+</div>
+
 ## Demo
 We provide a demo script to visualize the reconstruction from masked views in [muskie-visualize.ipynb](./muskie-visualize.ipynb). The pretrained weights can be downloaded from [here](https://drive.google.com/drive/folders/1uKXUlAwE66Wdes_fykKVNjuP1wDxBylg?usp=drive_link).
 
