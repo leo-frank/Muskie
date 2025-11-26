@@ -11,7 +11,7 @@ from torch.utils import checkpoint
 from util.rope import RotaryPositionEmbedding2D, PositionGetter
 from util.generate_mask import generate_connected_masks
 from util.misc import broadcast
-
+from einops import rearrange
 
 # ---------------------------
 # Utilities: PatchEmbed
@@ -306,27 +306,37 @@ class MultiViewCroco(nn.Module):
 
         return loss_dict, per_instance_loss, pred, conf, mask
 
-    def extract_feature(self, images: torch.Tensor):
+    def get_latent_embeddings(self, images: torch.Tensor):
+        """
+        images: (B, V, C, H, W), without normalization
+        returns: per-view token lists
+        """
         B, V, _, H, W = images.shape
-        x, (Hp, Wp) = self.patch_embed(images.view(B*V,3,H,W))
-
-        x = x.view(B, V, Hp*Wp, -1) # (B, N_patches, E)
+        
+        # Get patch embeddings from encoder
+        x, (Hp, Wp) = self.patch_embed(images.view(B*V, 3, H, W))
+        x = x.view(B, V, Hp*Wp, -1)  # (B, V, L, E)
+        
+        # Add register tokens
         x = torch.cat((self.register_tokens.expand(B, V, -1, -1), x), dim=2)
-
+        
+        # Get positional embeddings
         pos = self.position_getter(B * V, Hp, Wp, device=images.device).view(B, V, Hp*Wp, -1)
         pos = pos + 1
         pos = torch.cat((torch.zeros(B, V, self.num_register_tokens, 2).to(pos), pos), dim=2)
-
-        # run blocks
-        saved_xs = []
-        for i, blk in enumerate(self.blocks):
+        
+        # Run encoder blocks
+        enc_tokens = []
+        for blk in self.blocks:
             if self.enable_checkpoint:
-                x = checkpoint.checkpoint(blk, x, pos)
+                x = checkpoint.checkpoint(blk, x, pos, use_reentrant=False)
             else:
                 x = blk(x, pos)
-            saved_xs.append(x[:,:,self.num_register_tokens:].view(B, V, Hp, Wp, -1))
-
-        return saved_xs
+            enc_tokens.append(
+                rearrange(x[:, :, self.num_register_tokens:, :], 'b v l e -> (b v) l e')
+            )
+        
+        return enc_tokens
 
 
 def small(**kwargs):
