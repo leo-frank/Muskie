@@ -23,17 +23,17 @@ Here we provide PCA visualizations of learned features and comparison with DINOv
 <div align="center">
     <img src="examples/original_linken.png" width="70%" />
     <br>
-    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom:">
         Input Images
     </div><br>
     <img src="examples/pca_view_7.png" width="70%" />
     <br>
-    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom:">
         Muskie
     </div><br>
     <img src="examples/pca_dino.png" width="70%" />
     <br>
-    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom: 5px;">
+    <div style="color:gray; border-bottom: 0.5px solid #d9d9d9; display: inline-block; margin-bottom:">
         DINOv3
     </div>
 
