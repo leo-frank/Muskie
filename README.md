@@ -40,8 +40,16 @@ torchrun --nproc_per_node 8 train_ffrecon.py \
 ```
 To resume training, add option like ```train.resume=./output_dir/ffrecon/muskie_large_4layers/checkpoint-latest.pth```
 
-You can change the model.decoder_depth to a larger number to get better 3D reconstruction.
-
+You can change the model.decoder_depth to a larger number to get better 3D reconstruction. We provide an example here that train a model with 40 decoder layer, which has similar size with VGGT and &pi;³.
+```shell
+torchrun --nproc_per_node 8 train_ffrecon.py train.epochs=200 enable_checkpoint=True \
+        model_name=muskie_large \
+        model.decoder_depth=20 \
+        train.batch_size=4 \
+        train.optimizer.warmup_epochs=2 \
+        train.optimizer.lr=4e-5 \
+        paths.output_dir=./output_dir/ffrecon/muskie_large_40layers/
+```
 ## Pre-training
 
 The pre-training takes about two weeks for Muskie-L and one week for Muskie-B on 8 A100 GPUs.
