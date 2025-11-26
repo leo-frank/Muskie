@@ -4,191 +4,75 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import gzip
-import json
-import os.path as osp
 import os
+import os.path as osp
 import logging
-
-import cv2
 import random
+import glob
+import pickle
+import cv2
 import numpy as np
+from torch.utils.data import Dataset
+from downstreams.utils.geometry import closed_form_inverse_se3
+from downstreams.datasets.dataset_util import *
+from downstreams.datasets.base_dataset import BaseDataset
+import torch
 
-
-from data.dataset_util import *
-from data.base_dataset import BaseDataset
-from vggt.utils.geometry import closed_form_inverse_se3
-
-def imread_cv2(path, options=cv2.IMREAD_COLOR):
-    """ Open an image or a depthmap with opencv-python.
-    """
-    if path.endswith(('.exr', 'EXR')):
-        options = cv2.IMREAD_ANYDEPTH
-    img = cv2.imread(path, options)
-    if img is None:
-        raise IOError(f'Could not load image={path} with {options=}')
-    if img.ndim == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return img
-
-def _read_depthmap(depthpath, input_metadata):
-    depthmap = imread_cv2(depthpath, cv2.IMREAD_UNCHANGED)
-    depthmap = (depthmap.astype(np.float32) / 65535) * np.nan_to_num(input_metadata['maximum_depth'])
-    return depthmap
-SEEN_CATEGORIES = [
-    "apple",
-    "backpack",
-    "banana",
-    "baseballbat",
-    "baseballglove",
-    "bench",
-    "bicycle",
-    "bottle",
-    "bowl",
-    "broccoli",
-    "cake",
-    "car",
-    "carrot",
-    "cellphone",
-    "chair",
-    "cup",
-    "donut",
-    "hairdryer",
-    "handbag",
-    "hydrant",
-    "keyboard",
-    "laptop",
-    "microwave",
-    "motorcycle",
-    "mouse",
-    "orange",
-    "parkingmeter",
-    "pizza",
-    "plant",
-    "stopsign",
-    "teddybear",
-    "toaster",
-    "toilet",
-    "toybus",
-    "toyplane",
-    "toytrain",
-    "toytruck",
-    "tv",
-    "umbrella",
-    "vase",
-    "wineglass",
-]
-
-
-class Co3dDusterDataset(BaseDataset):
+class Co3dDataset(BaseDataset):
     def __init__(
         self,
-        common_conf,
+        len_train: int = 50000,
+        len_test: int = 5000,
         split: str = "train",
-        CO3D_DIR: str = None,
-        CO3D_ANNOTATION_DIR: str = None,
-        min_num_images: int = 24,
-        len_train: int = 100000,
-        len_test: int = 10000,
+        expand_ratio = 4,
+        Co3d_DIR: str = "",
     ):
         """
-        Initialize the Co3dDataset.
+        Initialize the ARDataset.
 
         Args:
-            common_conf: Configuration object with common settings.
             split (str): Dataset split, either 'train' or 'test'.
-            CO3D_DIR (str): Directory path to CO3D data.
-            CO3D_ANNOTATION_DIR (str): Directory path to CO3D annotations.
-            min_num_images (int): Minimum number of images per sequence.
+            AR_DIR (str): Directory path to AR data.
             len_train (int): Length of the training dataset.
             len_test (int): Length of the test dataset.
-        Raises:
-            ValueError: If CO3D_DIR or CO3D_ANNOTATION_DIR is not specified.
+            expand_range (int): Range for expanding nearby image selection.
+            get_nearby_thres (int): Threshold for nearby image selection.
         """
-        super().__init__(common_conf=common_conf)
+        super(Co3dDataset, self).__init__(len_train, len_test, split, expand_ratio)
 
-        self.debug = common_conf.debug
-        self.training = common_conf.training
-        self.get_nearby = common_conf.get_nearby
-        self.load_depth = common_conf.load_depth
-        self.inside_random = common_conf.inside_random
-        self.allow_duplicate_img = common_conf.allow_duplicate_img
+        self.Co3d_DIR = Co3d_DIR
+        logging.info(f"Co3d_DIR is {self.Co3d_DIR}")
 
-        if CO3D_DIR is None or CO3D_ANNOTATION_DIR is None:
-            raise ValueError("Both CO3D_DIR and CO3D_ANNOTATION_DIR must be specified.")
+        with open(osp.join(self.Co3d_DIR, 'co3d_valid_seqs.txt'), "r") as f:
+            seq_list = [line.strip() for line in f.readlines()]
 
-        category = sorted(SEEN_CATEGORIES)
-
-        if self.debug:
-            category = ["apple"]
-
-        if split == "train":
-            split_name_list = ["train"]
-            self.len_train = len_train
-        elif split == "test":
-            split_name_list = ["test"]
-            self.len_train = len_test
-        else:
-            raise ValueError(f"Invalid split: {split}")
-
-        self.invalid_sequence = [] # set any invalid sequence names here
-
-
-        self.category_map = {}
-        self.data_store = {}
-        self.seqlen = None
-        self.min_num_images = min_num_images
-
-        logging.info(f"CO3D_DIR is {CO3D_DIR}")
-
-        self.CO3D_DIR = CO3D_DIR
-        self.CO3D_ANNOTATION_DIR = CO3D_ANNOTATION_DIR
-
-        total_frame_num = 0
-
-        for c in category:
-            for split_name in split_name_list:
-                annotation_file = osp.join(
-                    self.CO3D_ANNOTATION_DIR, f"{c}_{split_name}.jgz"
-                )
-
-                try:
-                    with gzip.open(annotation_file, "r") as fin:
-                        annotation = json.loads(fin.read())
-                except FileNotFoundError:
-                    logging.error(f"Annotation file not found: {annotation_file}")
-                    continue
-
-                for seq_name, seq_data in annotation.items():
-                    if len(seq_data) < min_num_images:
-                        continue
-                    if seq_name in self.invalid_sequence:
-                        continue
-                    total_frame_num += len(seq_data)
-                    self.data_store[seq_name] = seq_data
-                    
-                    # only one sequence for debug
-                    if self.debug:
-                        break
-
-        self.sequence_list = list(self.data_store.keys())
+        self.sequence_list = seq_list
         self.sequence_list_len = len(self.sequence_list)
-        self.total_frame_num = total_frame_num
 
-        status = "Training" if self.training else "Testing"
-        logging.info(f"{status}: Co3D Data size: {self.sequence_list_len}")
-        logging.info(f"{status}: Co3D Data dataset length: {len(self)}")
+        logging.info(f"{self.status}: Co3D Real Data size: {self.sequence_list_len}")
+        logging.info(f"{self.status}: Co3D Data dataset length: {len(self)}")
 
-    def _get_metadatapath(self, obj, instance, view_idx):
-        return osp.join(self.CO3D_DIR, obj, instance, 'images', f'frame{view_idx:06n}.npz')
+    def _get_impath(self, seq_name, view_idx):
+        return osp.join(self.Co3d_DIR, seq_name, 'images', f'frame{view_idx:06n}.jpg')
 
-    def get_data(
+    def _get_depthpath(self, seq_name, view_idx):
+        return osp.join(self.Co3d_DIR, seq_name, 'depths', f'frame{view_idx:06n}.jpg.geometric.png')
+
+    def _get_maskpath(self, seq_name, view_idx):
+        return osp.join(self.Co3d_DIR, seq_name, 'masks', f'frame{view_idx:06n}.png')
+
+    def _read_depthmap(self, depthpath, input_metadata):
+        depthmap = imread_cv2(depthpath, cv2.IMREAD_UNCHANGED)
+        depthmap = (depthmap.astype(np.float32) / 65535) * np.nan_to_num(input_metadata['maximum_depth'])
+        return depthmap
+
+    def _get_metadatapath(self, seq_name, view_idx):
+        return osp.join(self.Co3d_DIR, seq_name, 'images', f'frame{view_idx:06n}.npz')
+
+    def __getitem__(
         self,
         seq_index: int = None,
-        img_per_seq: int = None,
-        seq_name: str = None,
-        ids: list = None,
-        aspect_ratio: float = 1.0,
+        img_per_seq: int = 8,
     ) -> dict:
         """
         Retrieve data for a specific sequence.
@@ -196,78 +80,64 @@ class Co3dDusterDataset(BaseDataset):
         Args:
             seq_index (int): Index of the sequence to retrieve.
             img_per_seq (int): Number of images per sequence.
-            seq_name (str): Name of the sequence.
-            ids (list): Specific IDs to retrieve.
             aspect_ratio (float): Aspect ratio for image processing.
 
         Returns:
             dict: A batch of data including images, depths, and other metadata.
         """
-        if self.inside_random:
-            seq_index = random.randint(0, self.sequence_list_len - 1)
-            
-        if seq_name is None:
-            seq_name = self.sequence_list[seq_index]
+        seq_index = seq_index % self.sequence_list_len
+        seq_name = self.sequence_list[seq_index % self.sequence_list_len]
+        img_dir = os.path.join(self.Co3d_DIR, seq_name, 'images')
+        available_images = sorted(glob.glob(osp.join(img_dir, "*.jpg")))
+        num_images = len(available_images)
+        all_frame_nums = [int(osp.splitext(osp.basename(p))[0].replace('frame', '')) for p in available_images]
 
-        metadata = self.data_store[seq_name]
+        ids = np.random.choice(num_images, img_per_seq, replace=self.allow_duplicate_img)
+        # if self.get_nearby:
+        #     ids = self.get_nearby_ids(ids, num_images, expand_ratio=self.expand_ratio)
 
-        if ids is None:
-            ids = np.random.choice(
-                len(metadata), img_per_seq, replace=self.allow_duplicate_img
-            )
 
-        annos = [metadata[i] for i in ids]
-
-        target_image_shape = self.get_target_shape(aspect_ratio)
-
+        target_image_shape = np.array([224, 224])
         images = []
+        images_paths = []
         depths = []
         cam_points = []
         world_points = []
         point_masks = []
         extrinsics = []
         intrinsics = []
-        image_paths = []
         original_sizes = []
 
+        for idx in ids:
+            view_index = all_frame_nums[idx]
+            
+            impath = self._get_impath(seq_name, view_index)
+            depthpath = self._get_depthpath(seq_name, view_index)
+            metadata_path = self._get_metadatapath(seq_name, view_index)
+            basename = osp.basename(impath)
 
-        for anno in annos:
-            filepath = anno["filepath"]
-            metapath = filepath.replace("jpg", "npz")
+            # image
+            image = imread_cv2(impath)
 
-            # rgb
-            image_path = osp.join(self.CO3D_DIR, filepath)
-            image = read_image_cv2(image_path)
+            # intrinscis and extrinsics (opencv format)
+            input_metadata = np.load(metadata_path)
+            camera_pose = input_metadata['camera_pose'].astype(np.float32)
+            extri_opencv = closed_form_inverse_se3(camera_pose[None])[0][:3, :] # w2c
+            intri_opencv = input_metadata['camera_intrinsics'].astype(np.float32)
+            
+            # depth map
+            depth_map = self._read_depthmap(depthpath, input_metadata)
 
-            # extrinsics, intrinsics
-            metadatapath = osp.join(self.CO3D_DIR, metapath)
-            input_metadata = np.load(metadatapath)
-            extri_opencv = input_metadata['camera_pose'].astype(np.float64) # c2w
-            extri_opencv = closed_form_inverse_se3(extri_opencv[None])[0][:3, :] # w2c
-            intri_opencv = input_metadata['camera_intrinsics'].astype(np.float64)
+            # load object mask
+            maskpath = self._get_maskpath(seq_name, view_index)
+            maskmap = imread_cv2(maskpath, cv2.IMREAD_UNCHANGED).astype(np.float32)
+            maskmap = (maskmap / 255.0) > 0.1
+            depth_map *= maskmap
 
-            # depth and mask
-            if self.load_depth:
-                depth_path = image_path.replace("/images", "/depths") + ".geometric.png"
-                depth_map = _read_depthmap(depth_path, input_metadata)
-
-                # TODO: why we need co3d masked 
-                # mvs_mask_path = image_path.replace(
-                #     "/images", "/masks"
-                # ).replace(".jpg", ".png")
-                # mvs_mask = cv2.imread(mvs_mask_path, cv2.IMREAD_GRAYSCALE) > 128
-                # depth_map[~mvs_mask] = 0
-
-                depth_map = threshold_depth_map(
-                    depth_map, min_percentile=-1, max_percentile=98
-                )
-            else:
-                depth_map = None
+            assert image.shape[:2] == depth_map.shape, f"Image and depth shape mismatch: {image.shape[:2]} vs {depth_map.shape}"
 
             original_size = np.array(image.shape[:2])
 
-            # print(image_path)
-            
             (
                 image,
                 depth_map,
@@ -284,26 +154,30 @@ class Co3dDusterDataset(BaseDataset):
                 intri_opencv,
                 original_size,
                 target_image_shape,
-                filepath=filepath,
+                filepath=impath,
             )
 
+            if (image.shape[:2] != target_image_shape).any():
+                logging.error(f"Wrong shape for {seq_name}: expected {target_image_shape}, got {image.shape[:2]}")
+                continue
+
             images.append(image)
+            images_paths.append(impath)
             depths.append(depth_map)
-            extrinsics.append(extri_opencv) # w2c
+            extrinsics.append(extri_opencv)
             intrinsics.append(intri_opencv)
             cam_points.append(cam_coords_points)
             world_points.append(world_coords_points)
             point_masks.append(point_mask)
-            image_paths.append(image_path)
             original_sizes.append(original_size)
 
-        set_name = "co3d"
-
+        set_name = "Co3D"
         batch = {
             "seq_name": set_name + "_" + seq_name,
             "ids": ids,
             "frame_num": len(extrinsics),
             "images": images,
+            "images_paths": images_paths,
             "depths": depths,
             "extrinsics": extrinsics,
             "intrinsics": intrinsics,
@@ -312,4 +186,53 @@ class Co3dDusterDataset(BaseDataset):
             "point_masks": point_masks,
             "original_sizes": original_sizes,
         }
-        return batch
+
+        sample = self.post_processing(batch)
+
+        return sample
+
+from downstreams.utils.train_utils import normalize_camera_extrinsics_and_points_batch
+def process_batch(batch):      
+    normalized_extrinsics, normalized_cam_points, normalized_world_points, normalized_depths, local_points = \
+        normalize_camera_extrinsics_and_points_batch(
+            extrinsics=batch["extrinsics"],
+            cam_points=batch["cam_points"],
+            world_points=batch["world_points"],
+            depths=batch["depths"],
+            point_masks=batch["point_masks"],
+        )
+    # Replace the original values in the batch with the normalized ones.
+    batch["extrinsics"] = normalized_extrinsics
+    batch["cam_points"] = normalized_cam_points
+    batch["world_points"] = normalized_world_points
+    batch["depths"] = normalized_depths
+    batch["local_points"] = local_points
+    return batch
+
+def save_ply(points, colors, filename):
+    import open3d as o3d                
+    if torch.is_tensor(points):
+        points_visual = points.reshape(-1, 3).cpu().numpy()
+    else:
+        points_visual = points.reshape(-1, 3)
+    if torch.is_tensor(colors):
+        points_visual_rgb = colors.reshape(-1, 3).cpu().numpy()
+    else:
+        points_visual_rgb = colors.reshape(-1, 3)
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(points_visual.astype(np.float64))
+    pcd.colors = o3d.utility.Vector3dVector(points_visual_rgb.astype(np.float64))
+    o3d.io.write_point_cloud(filename, pcd, write_ascii=True)
+
+from torch.utils.data import default_collate 
+if __name__ == "__main__":
+    dataste = Co3dDataset(Co3d_DIR='/data8T/co3d_processed/')
+    sample = dataste[500]
+    batch = default_collate([sample]) 
+    processed_batch = process_batch(batch)
+    save_ply(
+        processed_batch["world_points"][0].reshape(-1, 3), 
+        processed_batch["images"][0].permute(0, 2, 3, 1).reshape(-1, 3), 
+        "debug.ply"
+    )
+    print(1)
