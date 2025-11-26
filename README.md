@@ -25,6 +25,22 @@ We provide a demo script to visualize the reconstruction from masked views in [m
   <img src="examples/demo.png" height="600">
 </div>
 
+## Train <u>Muskie-powered</u> Feed-Forward 3D Reconstruction Model
+
+Use the following codes to reproduce the same configuration as our paper:
+```shell
+# Muskie-L as encoder, 4 layers decoder, DPT head to output 3D attributes
+torchrun --nproc_per_node 8 train_ffrecon.py \
+        model_name=muskie_large \
+        model.decoder_depth=2 \
+        train.batch_size=2 \
+        train.optimizer.warmup_epochs=2 \
+        train.optimizer.lr=4e-5 \
+        paths.output_dir=./output_dir/ffrecon/muskie_large_4layers/
+```
+To resume training, add option like ```train.resume=./output_dir/ffrecon/muskie_large_4layers/checkpoint-latest.pth```
+
+You can change the model.decoder_depth to a larger number to get better 3D reconstruction.
 
 ## Pre-training
 
@@ -42,7 +58,7 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
 ```
 Train Muskie-L with following codes:
 ```shell
-torchrun --nproc_per_node 8 --master_port 12345 main.py --warmup_epochs 2 \
+torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
          --model large --epochs 400 --epoch_size 100_000 --batch_size 16 \
          --lr 2e-4 --input_size_list 224 384 512 --log_dir output_dir/large \
          --output_dir output_dir/large \

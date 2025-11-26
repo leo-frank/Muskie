@@ -1,0 +1,155 @@
+# ==============================================================================
+# 1. Global Project Settings & Paths
+# ==============================================================================
+defaults:
+  - _self_
+
+# Change this to switch between model variants (e.g., muskie_large, muskie_base)
+# This automatically updates the encoder and head configurations below.
+model_name: muskie_large
+
+enable_checkpoint: False
+
+paths:
+  root_data: ./data_collection
+  output_dir: ./output_dir/ffrecon
+  log_dir: ${paths.output_dir}
+  pretrained_dir: ./checkpoints
+  
+  # Dataset sub-paths
+  arkit: ${paths.root_data}/arkitscenes_processed/Training/
+  blendedmvs: ${paths.root_data}/blendedmvs_processed
+  scannetpp: ${paths.root_data}/scannetpp_processed
+  sevenscenes: ${paths.root_data}/7scenes
+  nrgbd: ${paths.root_data}/neural_rgbd
+
+# ==============================================================================
+# 2. Training & Optimizer Parameters
+# ==============================================================================
+train:
+  batch_size: 64
+  epochs: 60
+  accum_iter: 1
+  start_epoch: 0
+  
+  optimizer:
+    weight_decay: 0.05
+    lr: null       # If null, calculated based on blr inside code
+    blr: 1.0e-3
+    min_lr: 0.0
+    warmup_epochs: 10
+  
+  resume: ''
+
+# ==============================================================================
+# 3. Model Architecture Configuration
+# ==============================================================================
+model:
+  
+  # References the global model_name defined at the top
+  encoder_type: ${model_name} 
+  decoder_depth: 20
+  
+  # Definitions for different model sizes
+  encoder_variants:
+    muskie_large:
+      embed_dim: 1024
+      decoder_depth: ${model.decoder_depth}
+      patch_size: 16
+      num_heads: 16
+      pretrained_ckpt: ${paths.pretrained_dir}/muskie-large.pth
+    
+    muskie_base:
+      embed_dim: 768
+      decoder_depth: ${model.decoder_depth}
+      patch_size: 16
+      num_heads: 12
+      pretrained_ckpt: ${paths.pretrained_dir}/muskie-base.pth
+
+  # Dynamically selects the configuration based on ${model_name}
+  current_encoder: ${model.encoder_variants[${model_name}]}
+
+  # Decoder/Head configuration
+  head:
+    enable_depth: False
+    enable_point: True
+    enable_camera: True
+    
+    # Hook configurations for specific architectures
+    muskie_large:
+      hooks_start: [3, 5, 8, 11] # 12 AA blocks
+      hooks_offset: ${model.current_encoder.decoder_depth}
+      embed_dim: ${model.current_encoder.embed_dim}
+      patch_size: ${model.current_encoder.patch_size}
+    muskie_base:
+      hooks_start: [2, 3, 4, 5]  # 6 AA blocks
+      hooks_offset: ${model.current_encoder.decoder_depth}
+      embed_dim: ${model.current_encoder.embed_dim}
+      patch_size: ${model.current_encoder.patch_size}
+
+    # Dynamically selects hooks based on ${model_name}
+    current_hooks: ${model.head.hooks_config[${model_name}]}
+
+  loss:
+    _target_: downstreams.loss.Pi3Loss
+    train_conf: False
+
+# ==============================================================================
+# 4. Data Configuration
+# ==============================================================================
+data:
+  num_workers: 32
+  pin_mem: true
+
+  train_dataset:
+    _target_: downstreams.datasets.composed_dataset.ComposedDataset
+    dataset_configs:
+      - _target_: downstreams.datasets.arkitscenes.ARKitScenesDataset
+        split: train
+        len_train: 15000
+        expand_ratio: 4
+        ARKitScenes_DIR: ${paths.arkit}
+      
+      - _target_: downstreams.datasets.blendedmvs_multiview.BlendedMVSMultiviewDataset
+        split: train
+        len_train: 15000
+        expand_ratio: 4
+        BlendedMVSMultiview_DIR: ${paths.blendedmvs}
+      
+      - _target_: downstreams.datasets.scannet.ScannetppDataset
+        split: train
+        len_train: 15000
+        expand_ratio: 2
+        Scannetpp_DIR: ${paths.scannetpp}
+
+  eval_dataset:
+    _target_: downstreams.datasets.composed_dataset.ComposedDataset
+    dataset_configs:
+      - _target_: downstreams.datasets.seven_scenes.SevenScenesultiviewDataset
+        split: test
+        len_test: 50
+        expand_ratio: 2
+        SevenScenesultiview_DIR: ${paths.sevenscenes}
+        
+      - _target_: downstreams.datasets.nrgbd.NRGBDMultiviewDataset
+        split: test
+        len_test: 50
+        expand_ratio: 2
+        NRGBDMultiview_DIR: ${paths.nrgbd}
+
+# ==============================================================================
+# 5. System & Distributed (Runtime defaults)
+# ==============================================================================
+system:
+  device: cuda
+  seed: 0
+  
+  # Distributed defaults (overwritten by launch script)
+  world_size: 1
+  local_rank: -1
+  dist_on_itp: false
+  dist_url: env://
+  gpu: 0
+  rank: 0
+  distributed: false
+  dist_backend: nccl
