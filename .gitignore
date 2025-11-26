@@ -1,5 +1,9 @@
 checkpoints/
-
+data_collection/
 __pycache__/
+.vscode/
 *.pyc
 .ipynb_checkpoints
+output_dir
+outputs/
+data_collection

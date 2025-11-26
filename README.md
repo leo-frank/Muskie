@@ -77,7 +77,7 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
 
 ## Checklist
 
-- [ ] Release the training code for downstream tasks
+<!-- - [ ] Release the training code for downstream tasks -->
 - [ ] Release the evaluation code for multi-view consistency
 - [ ] Release Muskie-Huge
 
