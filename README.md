@@ -93,10 +93,25 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
          --dynamic_batch --enable_checkpoint
 ```
 
+## Multi-view Consistency Evaluation (NAVI / ScanNet)
+
+We provide code to evaluate multi-view consistency on NAVI and ScanNet.
+
+1) Configure datasets in:
+- `evaluation/mv_consistency/configs/dataset/navi.yaml`
+- `evaluation/mv_consistency/configs/dataset/scannet.yaml`
+
+2) Run evaluation:
+```shell
+PYTHONPATH=. python evaluation/mv_consistency/eval_track.py dataset=navi
+PYTHONPATH=. python evaluation/mv_consistency/eval_track.py dataset=scannet
+```
+
+
 ## Checklist
 
 <!-- - [ ] Release the training code for downstream tasks -->
-- [ ] Release the evaluation code for multi-view consistency
+<!-- - [ ] Release the evaluation code for multi-view consistency -->
 - [ ] Release Muskie-Huge
 
 ## BibTeX
