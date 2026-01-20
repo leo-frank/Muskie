@@ -106,7 +106,7 @@ class Attention(nn.Module):
         self.rope = rope
         self.qk_norm = qk_norm
 
-    def forward(self, view, view_pos):
+    def forward(self, view, view_pos, ret_attn=False):
         B, L, C = view.shape
 
         qkv = self.qkv(view).reshape(B, L, 3, self.num_heads, C // self.num_heads).transpose(1,3)
@@ -116,11 +116,22 @@ class Attention(nn.Module):
             k = F.normalize(k, p=2, dim=-1)
         q = self.rope(q, view_pos)
         k = self.rope(k, view_pos)
-        view = F.scaled_dot_product_attention(q, k, v, dropout_p=self.attn_drop.p if self.training else 0.)
+        if ret_attn:
+            q = q * self.scale
+            attn = q @ k.transpose(-2, -1)
+            attn_tmp = attn.clone()
+            attn = attn.softmax(dim=-1)
+            attn = self.attn_drop(attn)
+            view = attn @ v
+        else:
+            view = F.scaled_dot_product_attention(q, k, v, dropout_p=self.attn_drop.p if self.training else 0.)
         view = view.transpose(1, 2).reshape(B, L, C)
         view = self.proj(view)
         view = self.proj_drop(view)
-        return view
+        if ret_attn:
+            return view, attn_tmp
+        else:
+            return view
 
 class AABlock(nn.Module):
 
@@ -143,7 +154,7 @@ class AABlock(nn.Module):
         # NOTE: drop path for stochastic depth, we shall see if this is better than dropout here
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
-    def forward(self, view, view_pos):
+    def forward(self, view, view_pos, ret_attn=False):
         B, V, L, C = view.shape
         view = view.view(B*V, L, C)
         view_pos = view_pos.view(B*V, L, 2)
@@ -152,11 +163,18 @@ class AABlock(nn.Module):
 
         view = view.view(B, V*L, C)
         view_pos = view_pos.view(B, V*L, 2)
-        view = view + self.drop_path(self.global_atten(self.norm3(view), view_pos))
+        if ret_attn:
+            x_tmp, attn_map = self.global_atten(self.norm3(view), view_pos, ret_attn=True)
+            view = view + self.drop_path(x_tmp)
+        else:
+            view = view + self.drop_path(self.global_atten(self.norm3(view), view_pos))
         view = view + self.drop_path(self.global_mlp(self.norm4(view)))
 
         view = view.view(B, V, L, C)
-        return view
+        if ret_attn:
+            return view, attn_map.mean(1) # average over head_dim: (B, num_heads, hp*wp, hp*wp) -> (B, hp*wp, hp*wp)
+        else:
+            return view
 
 
 # ---------------------------
@@ -306,7 +324,7 @@ class MultiViewCroco(nn.Module):
 
         return loss_dict, per_instance_loss, pred, conf, mask
 
-    def get_latent_embeddings(self, images: torch.Tensor):
+    def get_latent_embeddings(self, images: torch.Tensor, ret_attn: bool = False):
         """
         images: (B, V, C, H, W)
         returns: per-view token lists
@@ -327,17 +345,31 @@ class MultiViewCroco(nn.Module):
         
         # Run encoder blocks
         enc_tokens = []
+        attn_maps = []
         for blk in self.blocks:
             if self.enable_checkpoint:
                 x = checkpoint.checkpoint(blk, x, pos, use_reentrant=False)
             else:
-                x = blk(x, pos)
+                if ret_attn:
+                    x, attn_map = blk(x, pos, ret_attn=True)
+                    attn = rearrange(attn_map, 
+                        'b (v1 N1) (v2 N2) -> b v1 N1 v2 N2',
+                        v1=V, v2=V, 
+                        N1=self.num_register_tokens+Hp*Wp,
+                        N2=self.num_register_tokens+Hp*Wp
+                    )
+                    attn = attn[:, :, self.num_register_tokens:, :, self.num_register_tokens:]
+                    attn_maps.append(attn)
+                else:
+                    x = blk(x, pos, ret_attn=False)
             enc_tokens.append(
                 rearrange(x[:, :, self.num_register_tokens:, :], 'b v l e -> (b v) l e')
             )
         
-        return enc_tokens
-
+        if ret_attn:
+            return enc_tokens, attn_maps
+        else:
+            return enc_tokens
 
 def small(**kwargs):
     return MultiViewCroco(embed_dim=384, depth=6, num_heads=6, **kwargs)
