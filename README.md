@@ -96,6 +96,8 @@ torchrun --nproc_per_node 8 main.py --warmup_epochs 2 \
 ## Multi-view Consistency Evaluation (NAVI / ScanNet)
 
 We provide code to evaluate multi-view consistency on NAVI and ScanNet.
+Please follow the dataset preparation instructions at [probe3d/data_processing](https://github.com/mbanani/probe3d/blob/main/data_processing/README.md).
+We also fixed several data loading [bugs](https://github.com/mbanani/probe3d/issues/7) from the original probe3d codebase to ensure stable evaluation.
 
 1) Configure datasets in:
 - `evaluation/mv_consistency/configs/dataset/navi.yaml`
