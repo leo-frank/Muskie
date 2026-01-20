@@ -1,0 +1,2 @@
+_target_: evaluation.mv_consistency.dataset.scannet.ScanNetSequenceDataset
+root_dir: /home/pdl/liusidun_3d/lwy_3d/scannet_test_1500
