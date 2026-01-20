@@ -308,7 +308,7 @@ class MultiViewCroco(nn.Module):
 
     def get_latent_embeddings(self, images: torch.Tensor):
         """
-        images: (B, V, C, H, W), without normalization
+        images: (B, V, C, H, W)
         returns: per-view token lists
         """
         B, V, _, H, W = images.shape
