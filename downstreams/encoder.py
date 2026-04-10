@@ -49,10 +49,20 @@ class Encoder(nn.Module):
         self.rope = RotaryPositionEmbedding2D(frequency=rope_freq)
         self.position_getter = PositionGetter()
 
-        self.encoder = prepare_model(args.pretrained_ckpt, encoder_type, self.enable_checkpoint)
-        for name, value in (("_img_mean", [0.5, 0.5, 0.5]), ("_img_std", [0.5, 0.5, 0.5])):
-            self.register_buffer(name, torch.FloatTensor(
-                value).view(1, 1, 3, 1, 1), persistent=False)
+        if encoder_type == 'dinov3':
+            REPO_DIR =  'YOUR_REPO_DIR'
+            dinov3_vitl16 = torch.hub.load(REPO_DIR, 'dinov3_vitl16', source='local', weights='dino_ckpts/dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd.pth')
+            self.encoder = dinov3_vitl16
+            print("load dinov3")
+            if hasattr(self.encoder, "mask_token"): # Disable gradient updates for mask token
+                self.encoder.mask_token.requires_grad_(False)
+            for name, value in (("_img_mean", [0.485, 0.456, 0.406]), ("_img_std", [0.229, 0.224, 0.225])):
+                self.register_buffer(name, torch.FloatTensor(value).view(1, 1, 3, 1, 1), persistent=False)
+        elif 'muskie' in encoder_type:
+            self.encoder = prepare_model(args.pretrained_ckpt, encoder_type, self.enable_checkpoint)
+            for name, value in (("_img_mean", [0.5, 0.5, 0.5]), ("_img_std", [0.5, 0.5, 0.5])):
+                self.register_buffer(name, torch.FloatTensor(
+                    value).view(1, 1, 3, 1, 1), persistent=False)
 
         # Additional AA blocks besides main encoder (each AA block equals to 2 layers)
         if self.decoder_depth > 0:
